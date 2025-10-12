@@ -3,12 +3,26 @@ import gradio as gr
 import folium
 import requests
 import xml.etree.ElementTree as ET
+import re  # NEU
+
 
 SEARCH_URL = "https://api3.geo.admin.ch/rest/services/api/SearchServer"
 IDENTIFY_URL = "https://api3.geo.admin.ch/rest/services/api/MapServer/identify"
 GWR_PUBLIC_URL = "https://madd.bfs.admin.ch/eCH-0206"
 
+
 # ---------- Helpers ----------
+
+def extract_year(date_str):
+    """Extrahiert Jahr aus '2014', '2014-07' oder '2014-07-15' Format."""
+    if not date_str:
+        return None
+    try:
+        return int(date_str)
+    except ValueError:
+        match = re.match(r'^(\d{4})', str(date_str))
+        return int(match.group(1)) if match else None
+
 
 def geocode_address(address: str):
     """Adresse/Ort -> (lat, lon, label) via GeoAdmin SearchServer."""
@@ -20,6 +34,7 @@ def geocode_address(address: str):
         return None
     attrs = data["results"][0]["attrs"]
     return float(attrs["lat"]), float(attrs["lon"]), attrs.get("label", address)
+
 
 def identify_egid(lat: float, lon: float, sr: int, tolerance: int):
     """Einmaliger Identify-Call; gibt EGID oder None zurück."""
@@ -49,6 +64,7 @@ def identify_egid(lat: float, lon: float, sr: int, tolerance: int):
     print(f"  EGID found: {egid}")
     return egid
 
+
 def wgs84_to_lv95(lat, lon):
     """
     Grobe, dependency-freie Umrechnung WGS84 -> LV95 (CH).
@@ -61,6 +77,7 @@ def wgs84_to_lv95(lat, lon):
     e = 2600072.37 + 211455.93 * lon_aux - 10938.51 * lon_aux * lat_aux - 0.36 * lon_aux * lat_aux**2 - 44.54 * lon_aux**3
     n = 1200147.07 + 308807.95 * lat_aux + 3745.25 * lon_aux**2 + 76.63 * lat_aux**2 - 194.56 * lon_aux**2 * lat_aux + 119.79 * lat_aux**3
     return n, e
+
 
 def get_egid_from_point(lat: float, lon: float):
     """
@@ -76,6 +93,7 @@ def get_egid_from_point(lat: float, lon: float):
         print(f"[DEBUG] ✅ EGID gefunden (WGS84): {egid}")
         return egid
 
+
     # Versuch 2: LV95
     print("[DEBUG] Versuch 2: LV95 (sr=2056)")
     n, e = wgs84_to_lv95(lat, lon)
@@ -89,6 +107,7 @@ def get_egid_from_point(lat: float, lon: float):
     
     return egid
 
+
 def find_first_text(root: ET.Element, localnames):
     """Namespace-agnostisch: suche erstes Element, dessen lokaler Tagname in localnames ist."""
     for elem in root.iter():
@@ -96,6 +115,7 @@ def find_first_text(root: ET.Element, localnames):
         if tag in localnames and (elem.text and elem.text.strip()):
             return elem.text.strip()
     return None
+
 
 def get_gwr_public_info(egid: str | int) -> dict:
     """EGID -> öffentliche GWR-Infos via eCH-0206 (XML)."""
@@ -142,11 +162,14 @@ def get_gwr_public_info(egid: str | int) -> dict:
         print(f"[DEBUG] ❌ GWR-Fehler: {e}")
         return {}
 
+
 # ---------- UI-Callback ----------
+
 
 def show_address_on_map(address, basemap="swisstopo_grey"):
     if not address:
         return "<p>Bitte eine Adresse eingeben.</p>"
+
 
     try:
         print(f"\n{'='*60}")
@@ -161,6 +184,7 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
         print(f"[INFO] Gefunden: {label}")
         print(f"[INFO] Koordinaten: lat={lat}, lon={lon}")
 
+
         # EGID suchen
         egid = get_egid_from_point(lat, lon)
         
@@ -171,6 +195,7 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
         print(f"  - EGID: {egid or '❌ nicht gefunden'}")
         print(f"  - GWR-Daten: {gwr if gwr else '❌ keine Daten'}")
 
+
         # Karte erstellen
         m = folium.Map(
             location=[lat, lon],
@@ -178,6 +203,7 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
             control_scale=True,
             prefer_canvas=True
         )
+
 
         # Basemap
         if basemap == "swisstopo_grey":
@@ -201,6 +227,7 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
                 detect_retina=True
             ).add_to(m)
 
+
         # Popup mit Debug-Infos
         details = [
             f"<div style='font-family: Arial; min-width: 250px;'>",
@@ -213,16 +240,22 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
             details.append(f"<p style='margin: 5px 0;'><b>🏢 EGID:</b> {egid}</p>")
             
             if gwr.get("baujahr"):
-                baujahr = int(gwr["baujahr"])
-                if baujahr < 1990:
+                baujahr = extract_year(gwr["baujahr"])  # GEÄNDERT
+                if baujahr and baujahr < 1990:  # GEÄNDERT
                     farbe = "red"
                     risiko = "HOCH ⚠️"
-                else:
+                elif baujahr:  # GEÄNDERT
                     farbe = "green"
                     risiko = "GERING ✅"
+                else:  # GEÄNDERT
+                    farbe = "gray"
+                    risiko = "UNBEKANNT"
                 
-                details.append(f"<p style='margin: 5px 0;'><b>📅 Baujahr:</b> {baujahr}</p>")
-                details.append(f"<p style='margin: 5px 0; padding: 8px; background-color: #{farbe}22; border-left: 3px solid {farbe};'><b>Asbestrisiko:</b> {risiko}</p>")
+                if baujahr:  # GEÄNDERT
+                    details.append(f"<p style='margin: 5px 0;'><b>📅 Baujahr:</b> {baujahr}</p>")
+                    details.append(f"<p style='margin: 5px 0; padding: 8px; background-color: #{farbe}22; border-left: 3px solid {farbe};'><b>Asbestrisiko:</b> {risiko}</p>")
+                else:
+                    details.append(f"<p style='margin: 5px 0; color: #888;'><i>⚠️ Baujahr nicht verfügbar</i></p>")
             else:
                 details.append(f"<p style='margin: 5px 0; color: #888;'><i>⚠️ Baujahr nicht verfügbar</i></p>")
             
@@ -240,14 +273,20 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
         details.append("</div>")
         popup_html = "".join(details)
 
+
         # Marker mit Farbe je nach Baujahr
         if egid and gwr.get("baujahr"):
-            baujahr = int(gwr["baujahr"])
-            marker_color = "red" if baujahr < 1990 else "green"
-            marker_icon = "exclamation-triangle" if baujahr < 1990 else "check-circle"
+            baujahr = extract_year(gwr["baujahr"])  # GEÄNDERT
+            if baujahr:  # GEÄNDERT
+                marker_color = "red" if baujahr < 1990 else "green"
+                marker_icon = "exclamation-triangle" if baujahr < 1990 else "check-circle"
+            else:  # GEÄNDERT
+                marker_color = "gray"
+                marker_icon = "question"
         else:
             marker_color = "gray"
             marker_icon = "question"
+
 
         folium.Marker(
             [lat, lon],
@@ -260,7 +299,9 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
             )
         ).add_to(m)
 
+
         return m._repr_html_()
+
 
     except Exception as e:
         import traceback
@@ -268,7 +309,9 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
         print(f"\n[ERROR] {error_details}")
         return f"<p>❌ <b>Fehler:</b> {e}</p><pre style='font-size: 10px;'>{error_details}</pre>"
 
+
 # ---------- Gradio App ----------
+
 
 with gr.Blocks(title="Smart Safety Map - Prototype", theme=gr.themes.Soft()) as demo:
     gr.Markdown("""
@@ -280,16 +323,6 @@ with gr.Blocks(title="Smart Safety Map - Prototype", theme=gr.themes.Soft()) as 
     - 🏢 EGID (Eidgenössischer Gebäudeidentifikator)
     - 📅 Baujahr aus dem GWR
     - ⚠️ Asbestrisiko-Bewertung (vor/nach 1990)
-                
-
-    ---
-    **Debug-Modus aktiviert:** Logs werden in der Konsole ausgegeben.
-    
-    **Farbcode:**
-    - 🔴 Rot: Baujahr < 1990 (Asbestrisiko)
-    - 🟢 Grün: Baujahr ≥ 1990 (kein Asbestrisiko)
-    - ⚪ Grau: Baujahr unbekannt
-
     """)
     
     with gr.Row():
@@ -308,16 +341,21 @@ with gr.Blocks(title="Smart Safety Map - Prototype", theme=gr.themes.Soft()) as 
     
     out = gr.HTML()
     
-    # Beispiele
+# Beispiele – mit automatischer Kartensuche beim Klick
     gr.Examples(
-        examples=[
-            ["Marktgasse 19, Bern"],
-            ["Bahnhofstrasse 1, Zürich"],
-            ["Bundesplatz 3, Bern"],
-            ["Seftigenstrasse 264, Wabern"],
-        ],
-        inputs=address
+    examples=[
+        ["Marktgasse 19, Bern"],
+        ["Bahnhofstrasse 1, Zürich"],
+        ["Bundesplatz 3, Bern"],
+        ["Trottenstrasse 5, Landschlacht"],
+        ["Seftigenstrasse 264, Wabern"],
+    ],
+    inputs=[address, basemap],   # Beide Inputs übergeben
+    outputs=out,                 # Output-Komponente definieren
+    fn=show_address_on_map,      # Callback-Funktion
+    run_on_click=True            # Direkt ausführen beim Klick
     )
+
     
     # Event handlers
     demo.load(show_address_on_map, inputs=[address, basemap], outputs=out)
