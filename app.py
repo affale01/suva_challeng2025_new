@@ -164,7 +164,15 @@ def get_gwr_public_info(egid: str | int) -> dict:
 
 
 # ---------- UI-Callback ----------
-
+# ---------- Gebäudekategorie Mapping ----------
+GEBKAT_MAPPING = {
+    "1010": "Provisorische Unterkunft",
+    "1020": "Gebäude mit ausschliesslicher Wohnnutzung",
+    "1030": "Andere Wohngebäude (Wohngebäude mit Nebennutzung)",
+    "1040": "Gebäude mit teilweiser Wohnnutzung",
+    "1060": "Gebäude ohne Wohnnutzung",
+    "1080": "Sonderbau"
+}
 
 def show_address_on_map(address, basemap="swisstopo_grey"):
     if not address:
@@ -260,7 +268,10 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
                 details.append(f"<p style='margin: 5px 0; color: #888;'><i>⚠️ Baujahr nicht verfügbar</i></p>")
             
             if gwr.get("gebaeudekategorie"):
-                details.append(f"<p style='margin: 5px 0;'><b>🏗️ Kategorie:</b> {gwr['gebaeudekategorie']}</p>")
+                gkat_code = str(gwr["gebaeudekategorie"]).strip()
+                gkat_text = GEBKAT_MAPPING.get(gkat_code, f"Unbekannte Kategorie ({gkat_code})")
+                details.append(f"<p style='margin: 5px 0;'><b>🏗️ Kategorie:</b> {gkat_text}</p>")
+
             
             if gwr.get("anzahl_wohnungen"):
                 details.append(f"<p style='margin: 5px 0;'><b>🏠 Wohnungen:</b> {gwr['anzahl_wohnungen']}</p>")
