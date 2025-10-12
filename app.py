@@ -280,6 +280,16 @@ with gr.Blocks(title="Smart Safety Map - Prototype", theme=gr.themes.Soft()) as 
     - 🏢 EGID (Eidgenössischer Gebäudeidentifikator)
     - 📅 Baujahr aus dem GWR
     - ⚠️ Asbestrisiko-Bewertung (vor/nach 1990)
+                
+
+    ---
+    **Debug-Modus aktiviert:** Logs werden in der Konsole ausgegeben.
+    
+    **Farbcode:**
+    - 🔴 Rot: Baujahr < 1990 (Asbestrisiko)
+    - 🟢 Grün: Baujahr ≥ 1990 (kein Asbestrisiko)
+    - ⚪ Grau: Baujahr unbekannt
+
     """)
     
     with gr.Row():
@@ -313,17 +323,7 @@ with gr.Blocks(title="Smart Safety Map - Prototype", theme=gr.themes.Soft()) as 
     demo.load(show_address_on_map, inputs=[address, basemap], outputs=out)
     address.submit(show_address_on_map, inputs=[address, basemap], outputs=out)
     basemap.change(show_address_on_map, inputs=[address, basemap], outputs=out)
-    
-    gr.Markdown("""
-    ---
-    **Debug-Modus aktiviert:** Logs werden in der Konsole ausgegeben.
-    
-    **Farbcode:**
-    - 🔴 Rot: Baujahr < 1990 (Asbestrisiko)
-    - 🟢 Grün: Baujahr ≥ 1990 (kein Asbestrisiko)
-    - ⚪ Grau: Baujahr unbekannt
-    """)
 
 if __name__ == "__main__":
     port = int(os.getenv("GRADIO_SERVER_PORT", os.getenv("PORT", "7860")))
-    demo.launch(server_name="0.0.0.0", server_port=port)
+demo.launch(server_name="0.0.0.0", server_port=7861)
