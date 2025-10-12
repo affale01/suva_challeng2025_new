@@ -248,18 +248,18 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
             details.append(f"<p style='margin: 5px 0;'><b>🏢 EGID:</b> {egid}</p>")
             
             if gwr.get("baujahr"):
-                baujahr = extract_year(gwr["baujahr"])  # GEÄNDERT
-                if baujahr and baujahr < 1990:  # GEÄNDERT
+                baujahr = extract_year(gwr["baujahr"])  
+                if baujahr and baujahr < 1990:  
                     farbe = "red"
-                    risiko = "HOCH ⚠️"
-                elif baujahr:  # GEÄNDERT
+                    risiko = "mögliches Asbestrisiko ⚠️"
+                elif baujahr:  
                     farbe = "green"
-                    risiko = "GERING ✅"
-                else:  # GEÄNDERT
+                    risiko = "kein Asbestrisiko da Baujahr > 1990 ✅"
+                else:  
                     farbe = "gray"
                     risiko = "UNBEKANNT"
                 
-                if baujahr:  # GEÄNDERT
+                if baujahr:  
                     details.append(f"<p style='margin: 5px 0;'><b>📅 Baujahr:</b> {baujahr}</p>")
                     details.append(f"<p style='margin: 5px 0; padding: 8px; background-color: #{farbe}22; border-left: 3px solid {farbe};'><b>Asbestrisiko:</b> {risiko}</p>")
                 else:
@@ -334,6 +334,13 @@ with gr.Blocks(title="Smart Safety Map - Prototype", theme=gr.themes.Soft()) as 
     - 🏢 EGID (Eidgenössischer Gebäudeidentifikator)
     - 📅 Baujahr aus dem GWR
     - ⚠️ Asbestrisiko-Bewertung (vor/nach 1990)
+                
+
+    #### **Farbcode:**
+    - 🟢 **Grün:** Baujahr ≥ 1990 → *geringes Asbestrisiko*  
+    - 🔴 **Rot:** Baujahr < 1990 → *Asbestrisiko vorhanden*  
+    - ⚪ **Grau:** Baujahr unbekannt  
+                
     """)
     
     with gr.Row():
