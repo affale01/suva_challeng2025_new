@@ -36,16 +36,23 @@ def geocode_address(address: str):
     return float(attrs["lat"]), float(attrs["lon"]), attrs.get("label", address)
 
 
-def identify_egid(lat: float, lon: float, sr: int, tolerance: int):
-    """Einmaliger Identify-Call; gibt EGID oder None zurück."""
+def identify_egid(e: float, n: float, tolerance: int = 5):
+    """
+    Identify-Call mit LV95-Koordinaten (sr=2056).
+    WICHTIG: Nur LV95 funktioniert zuverlässig mit tolerance!
+    """
+    # MapExtent: ±100m um den Punkt (für tolerance-Berechnung)
+    buffer = 100
+    map_extent = f"{e-buffer},{n-buffer},{e+buffer},{n+buffer}"
+    
     params = {
         "geometryType": "esriGeometryPoint",
-        "geometry": f"{lon},{lat}",  # x=lon, y=lat
-        "sr": sr,
+        "geometry": f"{e},{n}",  # LV95: East, North
+        "sr": 2056,  # NUR LV95!
         "layers": "all:ch.bfs.gebaeude_wohnungs_register",
         "tolerance": tolerance,
-        "mapExtent": "0,0,100,100",  # Geändert von 0,0,0,0
-        "imageDisplay": "100,100,96",  # Geändert von 1,1,96
+        "mapExtent": map_extent,  # Reale Koordinaten statt Dummy-Werte
+        "imageDisplay": "1000,1000,96",  # Realistischer Wert
         "returnGeometry": "false",
         "lang": "de",
     }
@@ -54,14 +61,16 @@ def identify_egid(lat: float, lon: float, sr: int, tolerance: int):
     js = r.json()
     
     # DEBUG: Print response
-    print(f"[DEBUG] Identify response für sr={sr}, tolerance={tolerance}:")
+    print(f"[DEBUG] Identify response (LV95):")
+    print(f"  E={e:.2f}, N={n:.2f}")
+    print(f"  tolerance={tolerance}, mapExtent={map_extent}")
     print(f"  Results count: {len(js.get('results', []))}")
     
     if not js.get("results"):
         return None
     
     egid = js["results"][0]["attributes"].get("egid")
-    print(f"  EGID found: {egid}")
+    print(f"  ✅ EGID found: {egid}")
     return egid
 
 
@@ -81,27 +90,29 @@ def wgs84_to_lv95(lat, lon):
 
 def get_egid_from_point(lat: float, lon: float):
     """
-    Koordinate -> EGID. Versucht zuerst sr=4326 (WGS84) mit größerer Toleranz,
-    fällt dann auf sr=2056 (LV95) zurück.
+    Koordinate -> EGID.
+    Wandelt WGS84 in LV95 um und nutzt NUR LV95 für die EGID-Suche.
+    (WGS84 funktioniert nicht zuverlässig mit tolerance!)
     """
     print(f"\n[DEBUG] Suche EGID für Koordinaten: lat={lat}, lon={lon}")
     
-    # Versuch 1: WGS84 mit höherer Toleranz
-    print("[DEBUG] Versuch 1: WGS84 (sr=4326), tolerance=50")
-    egid = identify_egid(lat, lon, sr=4326, tolerance=50)  # Erhöht von 15
-    if egid:
-        print(f"[DEBUG] ✅ EGID gefunden (WGS84): {egid}")
-        return egid
-
-
-    # Versuch 2: LV95
-    print("[DEBUG] Versuch 2: LV95 (sr=2056)")
+    # WGS84 -> LV95 umrechnen
     n, e = wgs84_to_lv95(lat, lon)
-    print(f"[DEBUG] Umgerechnete LV95-Koordinaten: N={n:.2f}, E={e:.2f}")
-    egid = identify_egid(lat=n, lon=e, sr=2056, tolerance=50)  # Erhöht von 15
+    print(f"[DEBUG] Umgerechnete LV95-Koordinaten: E={e:.2f}, N={n:.2f}")
+    
+    # Versuch 1: Enge Toleranz (5 Pixel)
+    print("[DEBUG] Versuch 1: LV95 mit tolerance=5")
+    egid = identify_egid(e, n, tolerance=5)
+    if egid:
+        print(f"[DEBUG] ✅ EGID gefunden: {egid}")
+        return egid
+    
+    # Versuch 2: Erweiterte Toleranz (15 Pixel) als Fallback
+    print("[DEBUG] Versuch 2: LV95 mit tolerance=15 (Fallback)")
+    egid = identify_egid(e, n, tolerance=15)
     
     if egid:
-        print(f"[DEBUG] ✅ EGID gefunden (LV95): {egid}")
+        print(f"[DEBUG] ✅ EGID gefunden (Fallback): {egid}")
     else:
         print("[DEBUG] ❌ Keine EGID gefunden")
     
@@ -270,7 +281,7 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
             if gwr.get("gebaeudekategorie"):
                 gkat_code = str(gwr["gebaeudekategorie"]).strip()
                 gkat_text = GEBKAT_MAPPING.get(gkat_code, f"Unbekannte Kategorie ({gkat_code})")
-                details.append(f"<p style='margin: 5px 0;'><b>🏗️ Kategorie:</b> {gkat_text}</p>")
+                details.append(f"<p style='margin: 5px 0;'><b>🗝️ Kategorie:</b> {gkat_text}</p>")
 
             
             if gwr.get("anzahl_wohnungen"):
@@ -287,11 +298,11 @@ def show_address_on_map(address, basemap="swisstopo_grey"):
 
         # Marker mit Farbe je nach Baujahr
         if egid and gwr.get("baujahr"):
-            baujahr = extract_year(gwr["baujahr"])  # GEÄNDERT
-            if baujahr:  # GEÄNDERT
+            baujahr = extract_year(gwr["baujahr"])
+            if baujahr:
                 marker_color = "red" if baujahr < 1990 else "green"
                 marker_icon = "exclamation-triangle" if baujahr < 1990 else "check-circle"
-            else:  # GEÄNDERT
+            else:
                 marker_color = "gray"
                 marker_icon = "question"
         else:
@@ -346,7 +357,7 @@ with gr.Blocks(title="Smart Safety Map - Prototype", theme=gr.themes.Soft()) as 
     with gr.Row():
         with gr.Column(scale=3):
             address = gr.Textbox(
-                label="🔍 Adresse/Ort eingeben",
+                label="📍 Adresse/Ort eingeben",
                 value="Marktgasse 19, Bern",
                 placeholder="z.B. Bundesplatz 3, Bern"
             )
@@ -382,4 +393,4 @@ with gr.Blocks(title="Smart Safety Map - Prototype", theme=gr.themes.Soft()) as 
 
 if __name__ == "__main__":
     port = int(os.getenv("GRADIO_SERVER_PORT", os.getenv("PORT", "7860")))
-demo.launch(server_name="0.0.0.0", server_port=7861)
+demo.launch(server_name="0.0.0.0")
