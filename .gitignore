@@ -6,21 +6,12 @@ __pycache__/
 
 # === Virtuelle Umgebung ===
 .env
-.venv/
-env/
-venv/
-ENV/
-env.bak/
 
-# === Jupyter Notebook Checkpoints ===
-.ipynb_checkpoints/
-
-# === Sonstige Cache-Dateien ===
-*.log
-*.sqlite3
-
-# === VS Code ===
-.vscode/
+# === Python Bytecode & Cache ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 
 # === System ===
 .DS_Store
