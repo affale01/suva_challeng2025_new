@@ -1,0 +1,14 @@
+# Python & venv
+__pycache__/
+*.pyc
+.venv/
+
+# Environment-Dateien
+.env
+
+# Daten- & Reports-Ordner
+data/
+reports/
+
+# CSV-Dateien (z. B. tägliche Importe)
+*.csv
