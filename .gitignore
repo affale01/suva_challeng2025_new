@@ -1,0 +1,27 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# === Virtuelle Umgebung ===
+.env
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+
+# === Jupyter Notebook Checkpoints ===
+.ipynb_checkpoints/
+
+# === Sonstige Cache-Dateien ===
+*.log
+*.sqlite3
+
+# === VS Code ===
+.vscode/
+
+# === System ===
+.DS_Store
+Thumbs.db
